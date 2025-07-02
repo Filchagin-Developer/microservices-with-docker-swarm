@@ -1,83 +1,60 @@
 # Multiservice application example
 
-
 You can find an example of a multiservice application in the `./src/` folder . Below is its conceptual diagram.
-
 
 <img src="misc/images/project_diagram.png"  width="800">
 
+The project is written in Java (JDK 8), but you don't need to know Java to deploy it in Docker containers. Knowing what dependencies it needs and how the individual services relate to each other is sufficient.
 
-The project is written in java (jdk8), but you do not need to know it to deploy it in docker containers. It is enough to know what dependencies it needs and how the individual services relate to each other.
-
-
-So, the application itself is a room booking service. Or rather its backend. It consists of nine parts (services in docker-compose terminology):
-
+The application itself is a room booking service. Or rather, its backend. It consists of nine parts, or services in Docker Compose terminology:
 
 1. Postgres database.
-2. Message queue - rabbitmq.
-3. Session service - user sessions manager service.
-4. Hotel service - hotel entities manager service.
-5. Payment service - payment manager service.
-6. Loyalty service - loyalty program manager service.
-7. Report service - statistic collector service.
-8. Booking service - reservation manager service.
-9. Gateway service - facade for interaction with the rest of the microservices
+2. Message queue — rabbitmq.
+3. Session service — user sessions manager service.
+4. Hotel service — hotel entities manager service.
+5. Payment service — payment manager service.
+6. Loyalty service — loyalty program manager service.
+7. Report service — statistic collector service.
+8. Booking service — reservation manager service.
+9. Gateway service — facade for interaction with the rest of the microservices
 
+Let's start with the first two services. For RabbitMQ, it is best to use the standard image since no additional configuration is needed (e.g., `rabbitmq:3-management-alpine`).
 
-Let's start with the first two services. For rabbitmq it is best to use the standard image, since no additional configuration is needed (e.g - rabbitmq:3-management-alpine).
+The corresponding services automatically populate the initial values of the PostgreSQL databases, but the databases themselves must be created by running the script: `src\services\database\init.sql`.
 
+For the other services, you have to work harder. There are several options, but we will only consider two of them.
 
-Population with the initial values of the postgres databases is done automatically by the corresponding services, but the databases themselves must be created by running the script `src\services\database\init.sql`
+## 1. Local build of JAR packages
 
-
-In the case of the other services, you have to work a little harder. There are several options here, but we will consider only two of them.
-
-
-## 1. Local build of jar packages
-
-
-Applications written in java are executed in a special virtual machine - jvm. The applications themselves are packaged as jar files which contain the program code itself and all the necessary dependencies. Thus, the most trivial way to run a java program would be to build the project locally (in this case using the package manager maven and its wrapper mvnw, which is in the folder with each servcion) by running the command `./mvnw package -DskipTests`. The first build of the first project may take a long time. After that the resulting jar file in the generated target folder will be the executable file.
-
+Applications written in Java are executed in a special virtual machine called the Java Virtual Machine (JVM). These applications are packaged as JAR files, which contain the program code and all necessary dependencies. The simplest way to run a Java program is to build the project locally using the package manager Maven and its wrapper MavenWrapper (MavenWrapper is in the folder with each service) by running the command: `./mvnw package -DskipTests`. The first build of the first project may take a long time. Afterwards, the resulting JAR file in the generated target folder will be the executable file.
 
 Now, in the Dockerfile on the base, for example, `openjdk:8-jdk-alpine`, it is sufficient to specify instructions to copy the built project and run it with the command `java -jar target/*.jar`.
 
+P.S. It's important to note that most services require a deployed PostgreSQL service to start correctly, so don't forget the `wait-for-it.sh` script.
 
-P.S.: It is important to remember here that most services require an already deployed service with postgres to start correctly, so don't forget about the `wait-for-it.sh` script.
+P.P.S. To avoid using the frequently changed `latest` tag, it is important to specify the exact tag of the base image. *Publicly available images do not change.*
 
+## 2. Building inside Docker
 
-P.P.S.: It is important to specify the exact tag of the base image to avoid using the frequently changed `latest` tag. *Public commonly used images do not change.*
+The problems with the previous approach become obvious when you try this option. There is too much manual work. So, we move on to building inside Docker.
 
+To do so, create a working directory inside the image, move all the necessary build files there, and then build.
 
-## 2. Building inside docker
-
-
-The problems of the previous approach are obvious if you try this option. Too much manual work. So we move on to building inside docker.
-
-
-To do this, you can create a working directory inside the image and move all the files needed for the build there, and then build it.
-
-
-Moreover, the maven manager supports a separate dependencies connection, which is the longest process in the build (separating this step from the build is an optimization based on the nature of the docker image layers). All dependencies are contained in a separate file, `pom.xml`, so the plan for the new Dockerfile is as follows:
-
+Additionally, the Maven manager supports a separate dependency connection, which is the longest process in the build. Separating this step from the build is an optimization based on the nature of Docker image layers. All dependencies are contained in a separate file, `pom.xml`, so the plan for the new Dockerfile is as follows:
 
 1. Create a working directory.
-2. Import the maven wrapper and `pom.xml`.
-3. Install the project dependencies with the command: `./mvnw dependency:go-offline`.
-4. Copy the project source code
-5. Build the project in the same way as the previous approach or run it with `./mvnw spring-boot:run`
+2. Import the Maven wrapper and `pom.xml`.
+3. Install the project dependencies using the following command: `./mvnw dependency:go-offline`.
+4. Copy the project source code.
+5. Build the project using the same approach as before, or run it with the command: `./mvnw spring-boot:run`.
 
+P.S. To reduce the size of the final image, use the multi-stage build approach, since not all the files used in the build are needed at runtime.
 
-P.S.: to reduce the size of the final image, the multi-stage build approach can be used, since not all of the files used in the build are needed at runtime.
+## What needs to be considered?
 
-
-## What needs to be considered
-
-
-Services in java expect a certain set of environment variables:
-
+Services in Java expect a certain set of environment variables:
 
 ### Session service
-
 
 - POSTGRES_HOST: <database host>
 - POSTGRES_PORT: 5432
@@ -85,11 +62,7 @@ Services in java expect a certain set of environment variables:
 - POSTGRES_PASSWORD: "postgres" (may differ)
 - POSTGRES_DB: users_db
 
-
-
-
 ### Hotel service
-
 
 - POSTGRES_HOST: <database host>
 - POSTGRES_PORT: 5432
@@ -97,9 +70,7 @@ Services in java expect a certain set of environment variables:
 - POSTGRES_PASSWORD: "postgres" (may differ)
 - POSTGRES_DB: hotels_db
 
-
 ### Payment service
-
 
 - POSTGRES_HOST: <database host>
 - POSTGRES_PORT: 5432
@@ -107,9 +78,7 @@ Services in java expect a certain set of environment variables:
 - POSTGRES_PASSWORD: "postgres" (may differ)
 - POSTGRES_DB: payments_db
 
-
 ### Loyalty service
-
 
 - POSTGRES_HOST: <database host>
 - POSTGRES_PORT: 5432
@@ -117,9 +86,7 @@ Services in java expect a certain set of environment variables:
 - POSTGRES_PASSWORD: "postgres" (may differ)
 - POSTGRES_DB: balances_db
 
-
 ### Report service
-
 
 - POSTGRES_HOST: <database host>
 - POSTGRES_PORT: 5432
@@ -133,9 +100,7 @@ Services in java expect a certain set of environment variables:
 - RABBIT_MQ_QUEUE_NAME: messagequeue
 - RABBIT_MQ_EXCHANGE: messagequeue-exchange
 
-
 ### Booking service
-
 
 - POSTGRES_HOST: <database host>
 - POSTGRES_PORT: 5432
@@ -155,9 +120,7 @@ Services in java expect a certain set of environment variables:
 - LOYALTY_SERVICE_HOST: <loyalty service host>
 - LOYALTY_SERVICE_PORT: 8085
 
-
 ### Gateway service
-
 
 - SESSION_SERVICE_HOST: <session service host>
 - SESSION_SERVICE_PORT: 8081
@@ -172,17 +135,14 @@ Services in java expect a certain set of environment variables:
 - REPORT_SERVICE_HOST: <report service host>
 - REPORT_SERVICE_PORT: 8086
 
-
 Services are open on the corresponding local ports:
-
-
-- Session service - 8081
-- Hotel service - 8082
-- Booking service - 8083
-- Payment service - 8084
-- Loyalty service - 8085
-- Report service - 8086
-- Gateway service - 8087
+- Session service — 8081;
+- Hotel service — 8082;
+- Booking service — 8083;
+- Payment service — 8084;
+- Loyalty service — 8085;
+- Report service — 8086;
+- Gateway service — 8087.
 
 
 
