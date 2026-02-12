@@ -28,7 +28,7 @@ For the other services, you have to work harder. There are several options, but 
 
 Applications written in Java are executed in a special virtual machine called the Java Virtual Machine (JVM). These applications are packaged as JAR files, which contain the program code and all necessary dependencies. The simplest way to run a Java program is to build the project locally using the package manager Maven and its wrapper MavenWrapper (MavenWrapper is in the folder with each service) by running the command: `./mvnw package -DskipTests`. The first build of the first project may take a long time. Afterwards, the resulting JAR file in the generated target folder will be the executable file.
 
-Now, in the Dockerfile on the base, for example, `openjdk:8-jdk-alpine`, it is sufficient to specify instructions to copy the built project and run it with the command `java -jar target/*.jar`.
+Now, in the Dockerfile on the base, for example, `openjdk:21-jdk-alpine`, it is sufficient to specify instructions to copy the built project and run it with the command `java -jar target/*.jar`.
 
 P.S. It's important to note that most services require a deployed PostgreSQL service to start correctly, so don't forget the `wait-for-it.sh` script.
 
