@@ -1,3 +1,13 @@
+.vagrant/
+*.log
+*.img
+*.qcow2
+*.fd
+worker_join_token.txt
+target/
+node_modules/
+
+
 # Prerequisites
 *.d
 
